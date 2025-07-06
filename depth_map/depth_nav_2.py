@@ -8,7 +8,7 @@ from time import strftime, gmtime
 def detect_navigable_zone(depth_image, width, height):
     """
     Detect navigable zone by thresholding depth to find floor (free space).
-    Returns: (x, y, w, h) of navigable zone rectangle.
+    Returns: (x, y, w, h) of rectangle, largest_contour for navigable zone.
     """
     # Threshold for floor (depth > 3m, beyond barriers)
     floor_mask = cv2.inRange(depth_image, 3000, 10000)  # 3m to 10m
@@ -24,8 +24,8 @@ def detect_navigable_zone(depth_image, width, height):
             x, y, w, h = cv2.boundingRect(largest_contour)
             # Center rectangle in navigable zone
             center_x = x + w // 2
-            return center_x - w//4, height//4, w//2, height//2
-    return width//4, height//4, width//2, height//2  # Fallback: center rectangle
+            return (center_x - w//4, height//4, w//2, height//2), largest_contour
+    return (width//4, height//4, width//2, height//2), None  # Fallback: center rectangle, no contour
 
 def main():
     # Configure RealSense pipeline
@@ -57,8 +57,12 @@ def main():
                 cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
 
             # Detect navigable zone
-            x, y, w, h = detect_navigable_zone(depth_image, 1280, 720)
+            (x, y, w, h), largest_contour = detect_navigable_zone(depth_image, 1280, 720)
             annotated_image = color_image.copy()
+            # Draw contour of navigable zone (blue)
+            if largest_contour is not None:
+                cv2.drawContours(annotated_image, [largest_contour], -1, (255, 0, 0), 2)
+            # Draw rectangle (green)
             cv2.rectangle(annotated_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv2.putText(annotated_image, 'Navigable Zone', (x, y - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
